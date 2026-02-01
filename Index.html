@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ozodbek Shop</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Ozodbek Shop</h1>
+        <small class="muted">Oziq-ovqat do‘koni — Savat + Checkout</small>
+      </div>
+    </div>
+
+    <div class="actions">
+      <div class="chip" id="whoChip"><span>👤</span><span class="muted">Kirish:</span> <b>Mehmon</b></div>
+      <button class="btn" id="loginBtn">Kirish</button>
+      <button class="btn primary" id="cartBtn">🛒 Savat <span id="cartCount" class="count">(0)</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="grid">
+    <!-- LEFT -->
+    <section class="card">
+      <div class="hd">
+        <h2>Mahsulotlar</h2>
+        <div class="row tools">
+          <div class="search">
+            <input id="q" placeholder="Qidirish (nom bo‘yicha)..." />
+          </div>
+          <div class="pillbar" id="pillbar">
+            <button class="pill active" data-filter="all">Barchasi</button>
+            <button class="pill" data-filter="discount">Chegirmali</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bd">
+        <div class="hint">
+          ✅ Haridor: ism/familiya/telefon bilan kiradi.<br>
+          ✅ Buyurtma: savat → checkout → naqd yoki karta.<br>
+          💾 Hozircha hammasi localStorage’da (backend keyin).
+        </div>
+
+        <div class="products" id="products"></div>
+
+        <div class="line"></div>
+
+        <div class="discountHead">
+          <div>
+            <h3 class="discountTitle">🔥 Chegirmalar</h3>
+            <div class="muted small">Eng yaxshi narxlar shu yerda</div>
+          </div>
+          <button class="discountBtn" id="discountBtn"><span>⚡</span> Chegirmali tovarlar</button>
+        </div>
+
+        <div class="discountGrid" id="discountGrid"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT -->
+    <aside class="card">
+      <div class="hd">
+        <h2>Savat & Buyurtma</h2>
+        <button class="btn danger" id="clearCartBtn">Tozalash</button>
+      </div>
+
+      <div class="bd">
+        <div id="cartEmpty" class="hint">Savat bo‘sh. Mahsulotlardan “Savatga” bosing.</div>
+        <div class="cartlist" id="cartList"></div>
+
+        <div class="line"></div>
+
+        <div class="tot"><span class="muted">Jami:</span> <b id="totalSum">0 so‘m</b></div>
+        <div class="hint" style="margin-top:8px">Buyurtma berish uchun checkoutda ma’lumot kiritiladi.</div>
+
+        <div class="line"></div>
+
+        <button class="btn success" id="checkoutBtn" style="width:100%">✅ Checkout / Sotib olish</button>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- LOGIN MODAL (Customer only) -->
+<div class="modal" id="loginModal">
+  <div class="box">
+    <div class="hd">
+      <h3>Kirish</h3>
+      <button class="x" data-close="loginModal">✕</button>
+    </div>
+    <div class="bd">
+      <div class="split">
+        <div>
+          <label class="muted small">Ism</label>
+          <input id="firstName" placeholder="Ism" />
+        </div>
+        <div>
+          <label class="muted small">Familiya</label>
+          <input id="lastName" placeholder="Familiya" />
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label class="muted small">Telefon</label>
+        <input id="phone" placeholder="+998 90 777 92 65" />
+      </div>
+
+      <div class="line"></div>
+
+      <button class="btn primary" id="doLogin" style="width:100%">Kirish</button>
+
+      <div class="hint" style="margin-top:10px">
+        Admin panel alohida sahifada. (Oddiy odamga ko‘rinmaydi.)
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHECKOUT MODAL -->
+<div class="modal" id="checkoutModal">
+  <div class="box">
+    <div class="hd">
+      <h3>Checkout — Sotib olish</h3>
+      <button class="x" data-close="checkoutModal">✕</button>
+    </div>
+
+    <div class="bd">
+      <div class="hint">Ism/familiya/telefon shart. To‘lov: karta yoki naqd.</div>
+
+      <div class="split" style="margin-top:10px">
+        <div>
+          <label class="muted small">Ism</label>
+          <input id="cFirst" placeholder="Ism" />
+        </div>
+        <div>
+          <label class="muted small">Familiya</label>
+          <input id="cLast" placeholder="Familiya" />
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label class="muted small">Telefon</label>
+        <input id="cPhone" placeholder="+998..." />
+      </div>
+
+      <div class="split" style="margin-top:10px">
+        <div>
+          <label class="muted small">To‘lov turi</label>
+          <select id="payMethod">
+            <option value="cash">Naqd</option>
+            <option value="card">Karta</option>
+          </select>
+        </div>
+        <div id="cardBox" style="display:none">
+          <label class="muted small">Karta raqam</label>
+          <input id="cardNumber" placeholder="8600 1234 5678 9012" />
+        </div>
+      </div>
+
+      <div class="line"></div>
+
+      <button class="btn success" id="placeOrderBtn" style="width:100%">📦 Buyurtmani yuborish</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ======================
+  // CONFIG
+  // ======================
+  const ADMIN_EMAIL = "kamolov.ozodbek51@gmail.com";
+  const K_PRODUCTS = "oz_shop_products_v3";
+  const K_CART     = "oz_shop_cart_v3";
+  const K_USER     = "oz_shop_user_v3";
+  const K_ORDERS   = "oz_shop_orders_v3";
+  const K_ADMIN_SESSION = "oz_shop_admin_session_v3"; // admin.html ishlatadi
+
+  // ======================
+  // Helpers
+  // ======================
+  const $  = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+  function fmt(n){
+    const x = Math.round(Number(n || 0));
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " so‘m";
+  }
+  function uid(){
+    return "id_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+  }
+  function toast(msg){
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._tm);
+    toast._tm = setTimeout(()=>t.classList.remove("show"), 2200);
+  }
+  function load(key, fallback){
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+    catch { return fallback; }
+  }
+  function save(key, val){
+    localStorage.setItem(key, JSON.stringify(val));
+  }
+  function openModal(id){ $("#"+id).classList.add("show"); }
+  function closeModal(id){ $("#"+id).classList.remove("show"); }
+
+  function normalizePhone(p){ return (p||"").replace(/\s+/g,"").trim(); }
+
+  // ======================
+  // Seed products (food)
+  // ======================
+  function seed(){
+    const p = load(K_PRODUCTS, null);
+    if (p && p.length) return;
+
+    const demo = [
+      { id: uid(), name:"Non (1 dona)", price:4000,  image_url:"https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=900&q=70", stock_qty:50, is_discount:false, discount_price:null },
+      { id: uid(), name:"Sut (1L)",      price:12000, image_url:"https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=900&q=70", stock_qty:30, is_discount:true,  discount_price:9900 },
+      { id: uid(), name:"Tuxum (10 dona)",price:22000,image_url:"https://images.unsplash.com/photo-1551218808-94e220e084d2?auto=format&fit=crop&w=900&q=70", stock_qty:40, is_discount:false, discount_price:null },
+      { id: uid(), name:"Guruch (1kg)",  price:18000, image_url:"https://images.unsplash.com/photo-1606787366850-de6330128bfc?auto=format&fit=crop&w=900&q=70", stock_qty:25, is_discount:true,  discount_price:15900 },
+      { id: uid(), name:"Shakar (1kg)",  price:16000, image_url:"https://images.unsplash.com/photo-1587049352858-8a26f3f0e7b4?auto=format&fit=crop&w=900&q=70", stock_qty:20, is_discount:false, discount_price:null },
+      { id: uid(), name:"Choy (100g)",   price:15000, image_url:"https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=900&q=70", stock_qty:35, is_discount:true,  discount_price:12900 }
+    ];
+    save(K_PRODUCTS, demo);
+  }
+  seed();
+
+  // ======================
+  // State
+  // ======================
+  let state = {
+    filter: "all",
+    q: "",
+    products: load(K_PRODUCTS, []),
+    cart: load(K_CART, {}),
+    user: load(K_USER, null),
+    orders: load(K_ORDERS, [])
+  };
+
+  // ======================
+  // UI bits
+  // ======================
+  function renderWho(){
+    const chip = $("#whoChip");
+    if (!state.user){
+      chip.innerHTML = `<span>👤</span><span class="muted">Kirish:</span> <b>Mehmon</b>`;
+      return;
+    }
+    const name = `${state.user.firstName||""} ${state.user.lastName||""}`.trim();
+    chip.innerHTML = `<span>👤</span><span class="muted">Kirish:</span> <b>${name || "Haridor"}</b>`;
+  }
+
+  function hasDiscount(p){
+    return !!p.is_discount && p.discount_price && p.discount_price < p.price;
+  }
+  function getUnitPrice(p){
+    return hasDiscount(p) ? p.discount_price : p.price;
+  }
+  function priceBlock(p){
+    if (!hasDiscount(p)) return `<div class="price"><span class="now">${fmt(p.price)}</span></div>`;
+    return `
+      <div class="price">
+        <span class="now">${fmt(p.discount_price)}</span>
+        <span class="old">${fmt(p.price)}</span>
+      </div>
+    `;
+  }
+
+  function getShownProducts(){
+    let list = [...state.products];
+
+    if (state.filter === "discount") list = list.filter(p => hasDiscount(p));
+    if (state.q.trim()){
+      const qq = state.q.trim().toLowerCase();
+      list = list.filter(p => (p.name||"").toLowerCase().includes(qq));
+    }
+    return list;
+  }
+
+  function renderProducts(){
+    const wrap = $("#products");
+    const list = getShownProducts();
+
+    wrap.innerHTML = list.map(p => {
+      const qtyInCart = state.cart[p.id] || 0;
+      return `
+        <div class="p">
+          <div class="img">
+            ${hasDiscount(p) ? `<span class="badge discount">Chegirma</span>` : ``}
+            <img src="${p.image_url}" alt="${(p.name||"").replace('"','')}" />
+          </div>
+          <div class="ct">
+            <div>
+              <h3>${p.name}</h3>
+              <div class="muted small" style="margin-top:4px">Ombor: <b>${p.stock_qty ?? 0}</b></div>
+            </div>
+            ${priceBlock(p)}
+            <div class="foot">
+              <div class="qty">
+                <button onclick="dec('${p.id}')">−</button>
+                <span><b>${qtyInCart}</b> ta</span>
+                <button onclick="inc('${p.id}')">+</button>
+              </div>
+              <button class="btn primary" onclick="addToCart('${p.id}')">Savatga</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderDiscounts(){
+    const wrap = $("#discountGrid");
+    const list = state.products.filter(p => hasDiscount(p));
+    if (!list.length){
+      wrap.innerHTML = "Hozircha chegirmali mahsulot yo‘q.";
+      return;
+    }
+    wrap.innerHTML = list.map(p => {
+      const qtyInCart = state.cart[p.id] || 0;
+      return `
+        <div class="p">
+          <div class="img">
+            <span class="badge discount">Chegirma</span>
+            <img src="${p.image_url}" alt="${(p.name||"").replace('"','')}" />
+          </div>
+          <div class="ct">
+            <div>
+              <h3>${p.name}</h3>
+              <div class="muted small" style="margin-top:4px">Ombor: <b>${p.stock_qty ?? 0}</b></div>
+            </div>
+            ${priceBlock(p)}
+            <div class="foot">
+              <div class="qty">
+                <button onclick="dec('${p.id}')">−</button>
+                <span><b>${qtyInCart}</b> ta</span>
+                <button onclick="inc('${p.id}')">+</button>
+              </div>
+              <button class="btn primary" onclick="addToCart('${p.id}')">Savatga</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // ======================
+  // Cart
+  // ======================
+  window.inc = function(id){
+    state.cart[id] = (state.cart[id] || 0) + 1;
+    save(K_CART, state.cart);
+    renderAll();
+  }
+  window.dec = function(id){
+    const v = (state.cart[id] || 0) - 1;
+    if (v <= 0) delete state.cart[id];
+    else state.cart[id] = v;
+    save(K_CART, state.cart);
+    renderAll();
+  }
+  window.addToCart = function(id){
+    state.cart[id] = (state.cart[id] || 0) + 1;
+    save(K_CART, state.cart);
+    toast("Savatga qo‘shildi ✅");
+    renderAll();
+  }
+  window.removeItem = function(id){
+    delete state.cart[id];
+    save(K_CART, state.cart);
+    renderAll();
+  }
+
+  function cartItems(){
+    const items = [];
+    for (const [pid, qty] of Object.entries(state.cart)){
+      const p = state.products.find(x => x.id === pid);
+      if (!p) continue;
+      items.push({ product: p, qty });
+    }
+    return items;
+  }
+
+  function cartTotal(){
+    return cartItems().reduce((sum, it) => sum + getUnitPrice(it.product) * it.qty, 0);
+  }
+
+  function renderCart(){
+    const items = cartItems();
+    $("#cartCount").textContent = `(${items.reduce((s,i)=>s+i.qty,0)})`;
+
+    $("#cartEmpty").style.display = items.length ? "none" : "block";
+
+    const list = $("#cartList");
+    list.innerHTML = items.map(it => {
+      const p = it.product;
+      const unit = getUnitPrice(p);
+      return `
+        <div class="item">
+          <div class="thumb"><img src="${p.image_url}" alt=""></div>
+          <div>
+            <h4>${p.name}</h4>
+            <div class="meta">${fmt(unit)} × <b>${it.qty}</b></div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn" onclick="dec('${p.id}')">−</button>
+              <button class="btn" onclick="inc('${p.id}')">+</button>
+              <button class="btn danger" onclick="removeItem('${p.id}')">O‘chirish</button>
+            </div>
+          </div>
+          <div class="right">
+            <div class="meta">Summa</div>
+            <b>${fmt(unit * it.qty)}</b>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    $("#totalSum").textContent = fmt(cartTotal());
+  }
+
+  // ======================
+  // Orders (created here, viewed in admin.html)
+  // ======================
+  function createOrder(payload){
+    const order = {
+      id: uid(),
+      created_at: new Date().toISOString(),
+      status: "new",
+      customer: payload.customer,
+      payment_method: payload.payment_method,
+      card_last4: payload.card_last4 || null,
+      items: payload.items.map(i => ({
+        product_id: i.product_id,
+        name: i.name,
+        unit_price: i.unit_price,
+        qty_requested: i.qty_requested,
+        qty_approved: i.qty_requested
+      }))
+    };
+    state.orders.unshift(order);
+    save(K_ORDERS, state.orders);
+    return order;
+  }
+
+  // ======================
+  // Checkout
+  // ======================
+  function openCheckout(){
+    const items = cartItems();
+    if (!items.length){ toast("Savat bo‘sh"); return; }
+
+    $("#cFirst").value = state.user?.firstName || "";
+    $("#cLast").value  = state.user?.lastName || "";
+    $("#cPhone").value = state.user?.phone || "";
+
+    $("#payMethod").value = "cash";
+    $("#cardBox").style.display = "none";
+    $("#cardNumber").value = "";
+    openModal("checkoutModal");
+  }
+
+  function placeOrder(){
+    const items = cartItems();
+    if (!items.length){ toast("Savat bo‘sh"); return; }
+
+    const firstName = $("#cFirst").value.trim();
+    const lastName  = $("#cLast").value.trim();
+    const phone     = $("#cPhone").value.trim();
+    const payMethod = $("#payMethod").value;
+
+    if (!firstName || !lastName || !phone){
+      toast("Ism, familiya, telefon majburiy");
+      return;
+    }
+
+    let cardLast4 = null;
+    if (payMethod === "card"){
+      const cn = $("#cardNumber").value.replace(/\s+/g,"").trim();
+      if (cn.length < 12){
+        toast("Karta raqamni to‘g‘ri kiriting");
+        return;
+      }
+      cardLast4 = cn.slice(-4);
+    }
+
+    const payload = {
+      customer: { firstName, lastName, phone: normalizePhone(phone) },
+      payment_method: payMethod,
+      card_last4: cardLast4,
+      items: items.map(it => ({
+        product_id: it.product.id,
+        name: it.product.name,
+        unit_price: getUnitPrice(it.product),
+        qty_requested: it.qty
+      }))
+    };
+
+    createOrder(payload);
+
+    // Cart clear
+    state.cart = {};
+    save(K_CART, state.cart);
+
+    // Save customer user
+    state.user = { role:"customer", firstName, lastName, phone: normalizePhone(phone) };
+    save(K_USER, state.user);
+
+    toast("Buyurtma yuborildi ✅");
+    closeModal("checkoutModal");
+    renderAll();
+  }
+
+  // ======================
+  // Events
+  // ======================
+  $("#loginBtn").addEventListener("click", ()=>openModal("loginModal"));
+  $("#cartBtn").addEventListener("click", ()=>window.scrollTo({top:0, behavior:"smooth"}));
+
+  $("#clearCartBtn").addEventListener("click", ()=>{
+    state.cart = {};
+    save(K_CART, state.cart);
+    renderAll();
+  });
+
+  $("#checkoutBtn").addEventListener("click", openCheckout);
+
+  $("#q").addEventListener("input", (e)=>{
+    state.q = e.target.value;
+    renderProducts();
+  });
+
+  $("#pillbar").addEventListener("click", (e)=>{
+    const b = e.target.closest(".pill");
+    if (!b) return;
+    $$("#pillbar .pill").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    state.filter = b.dataset.filter;
+    renderProducts();
+  });
+
+  $("#discountBtn").addEventListener("click", ()=>{
+    $("#discountBtn").classList.toggle("active");
+    $("#discountGrid").scrollIntoView({behavior:"smooth", block:"start"});
+  });
+
+  document.body.addEventListener("click", (e)=>{
+    const close = e.target.getAttribute("data-close");
+    if (close) closeModal(close);
+    if (e.target.classList.contains("modal")) e.target.classList.remove("show");
+  });
+
+  $("#doLogin").addEventListener("click", ()=>{
+    const firstName = $("#firstName").value.trim();
+    const lastName  = $("#lastName").value.trim();
+    const phone     = $("#phone").value.trim();
+
+    if (!firstName || !lastName || !phone){
+      toast("Ism, familiya, telefonni kiriting");
+      return;
+    }
+
+    state.user = { role:"customer", firstName, lastName, phone: normalizePhone(phone) };
+    save(K_USER, state.user);
+    toast("Kirish ✅");
+    closeModal("loginModal");
+    renderAll();
+  });
+
+  $("#payMethod").addEventListener("change", ()=>{
+    const isCard = $("#payMethod").value === "card";
+    $("#cardBox").style.display = isCard ? "block" : "none";
+  });
+
+  $("#placeOrderBtn").addEventListener("click", placeOrder);
+
+  // ======================
+  // Render
+  // ======================
+  function renderAll(){
+    state.products = load(K_PRODUCTS, []);
+    state.cart     = load(K_CART, {});
+    state.user     = load(K_USER, null);
+    state.orders   = load(K_ORDERS, []);
+
+    renderWho();
+    renderProducts();
+    renderDiscounts();
+    renderCart();
+  }
+  renderAll();
+
+  // ✅ Admin sahifa linkini ko‘rsatmaymiz.
+  // Agar sen tez kirishni xohlasang: brauzerda /admin.html deb ochasan.
+</script>
+</body>
+</html>

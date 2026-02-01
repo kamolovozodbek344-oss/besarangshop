@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Panel</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Panel</h1>
+        <small class="muted">Mahsulotlar + Buyurtmalar</small>
+      </div>
+    </div>
+
+    <div class="actions">
+      <div class="chip" id="statusChip"><span>🔒</span><span class="muted">Holat:</span> <b>Tekshiruv</b></div>
+      <button class="btn" id="logoutBtn">Chiqish</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="grid">
+    <!-- LEFT: Product CRUD -->
+    <section class="card">
+      <div class="hd">
+        <h2>Mahsulot boshqarish</h2>
+        <div class="row">
+          <button class="btn success" id="newBtn">➕ Yangi mahsulot</button>
+          <button class="btn" id="refreshBtn">🔄 Yangilash</button>
+        </div>
+      </div>
+
+      <div class="bd">
+        <div class="hint">Rasmni JPG qilib yuklang (yoki URL). Mahsulot qo‘shish/tahrirlash/o‘chirish.</div>
+
+        <div class="line"></div>
+
+        <div class="split">
+          <div>
+            <label class="muted small">Nomi</label>
+            <input id="pName" placeholder="Masalan: Sut 1L" />
+          </div>
+          <div>
+            <label class="muted small">Narxi (so‘m)</label>
+            <input id="pPrice" type="number" placeholder="12000" />
+          </div>
+        </div>
+
+        <div class="split" style="margin-top:10px">
+          <div>
+            <label class="muted small">Rasm (JPG)</label>
+            <input id="pImgFile" type="file" accept="image/jpeg" class="file" />
+            <div class="imgPreviewWrap">
+              <img id="pImgPreview" alt="preview" />
+              <div class="muted small" id="pImgPreviewHint">JPG tanlasangiz shu yerda ko‘rinadi</div>
+            </div>
+          </div>
+          <div>
+            <label class="muted small">yoki Rasm URL</label>
+            <input id="pImgUrl" placeholder="https://...jpg (ixtiyoriy)" />
+            <div style="height:10px"></div>
+            <label class="muted small">Ombordagi miqdor</label>
+            <input id="pStock" type="number" placeholder="10" />
+          </div>
+        </div>
+
+        <div class="split" style="margin-top:10px">
+          <div>
+            <label class="muted small">Chegirmali?</label>
+            <select id="pDiscount">
+              <option value="0">Yo‘q</option>
+              <option value="1">Ha</option>
+            </select>
+          </div>
+          <div>
+            <label class="muted small">Chegirma narxi (so‘m)</label>
+            <input id="pDiscountPrice" type="number" placeholder="9900 (ixtiyoriy)" />
+          </div>
+        </div>
+
+        <div class="line"></div>
+
+        <div class="row" style="justify-content:space-between">
+          <div class="muted small" id="modeText">Yangi mahsulot</div>
+          <button class="btn danger" id="cancelEditBtn" style="display:none">Bekor</button>
+        </div>
+
+        <div style="height:8px"></div>
+        <button class="btn primary" id="saveBtn" style="width:100%">💾 Saqlash</button>
+
+        <div class="line"></div>
+
+        <b>Mahsulotlar</b>
+        <div class="muted small" style="margin-top:4px">Tahrirlash yoki o‘chirish</div>
+
+        <div style="height:10px"></div>
+        <div class="adminList" id="list"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Orders -->
+    <aside class="card">
+      <div class="hd">
+        <h2>Buyurtmalar</h2>
+        <button class="btn" id="refreshOrdersBtn">🔄</button>
+      </div>
+      <div class="bd">
+        <div class="hint">Haridorlar buyurtmalarini ko‘rasiz. qty_approved ni moslab qo‘ying.</div>
+        <div class="line"></div>
+        <div class="orders" id="orders"></div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- EMAIL CHECK MODAL -->
+<div class="modal show" id="gateModal">
+  <div class="box">
+    <div class="hd">
+      <h3>Kirish</h3>
+      <button class="x" id="gateClose">✕</button>
+    </div>
+    <div class="bd">
+      <div class="hint">Email kiriting.</div>
+      <div style="height:10px"></div>
+      <input id="gateEmail" placeholder="Email" />
+      <div class="line"></div>
+      <button class="btn primary" id="gateBtn" style="width:100%">Kirish</button>
+      <div class="hint small" style="margin-top:10px">Agar email noto‘g‘ri bo‘lsa “Email xato” chiqadi.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ADMIN_EMAIL = "kamolov.ozodbek51@gmail.com";
+  const K_PRODUCTS = "oz_shop_products_v3";
+  const K_ORDERS   = "oz_shop_orders_v3";
+  const K_ADMIN_SESSION = "oz_shop_admin_session_v3";
+
+  const $  = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+  function toast(msg){
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._tm);
+    toast._tm = setTimeout(()=>t.classList.remove("show"), 2200);
+  }
+
+  function load(key, fallback){
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+    catch { return fallback; }
+  }
+  function save(key, val){
+    localStorage.setItem(key, JSON.stringify(val));
+  }
+  function fmt(n){
+    const x = Math.round(Number(n || 0));
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " so‘m";
+  }
+  function uid(){
+    return "id_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+  }
+
+  function hasDiscount(p){
+    return !!p.is_discount && p.discount_price && p.discount_price < p.price;
+  }
+
+  // ===== Gate (email check) =====
+  function isSessionOk(){
+    const ses = load(K_ADMIN_SESSION, null);
+    return ses && typeof ses === "object" && ses.ok === true;
+  }
+
+  function setSessionOk(ok){
+    save(K_ADMIN_SESSION, { ok: !!ok, t: Date.now() });
+  }
+
+  function requireGate(){
+    $("#statusChip").innerHTML = `<span>🔒</span><span class="muted">Holat:</span> <b>Tekshiruv</b>`;
+    $("#gateModal").classList.add("show");
+  }
+
+  function unlock(){
+    $("#statusChip").innerHTML = `<span>✅</span><span class="muted">Holat:</span> <b>Ruxsat bor</b>`;
+    $("#gateModal").classList.remove("show");
+  }
+
+  $("#gateBtn").addEventListener("click", ()=>{
+    const email = ($("#gateEmail").value || "").trim().toLowerCase();
+    if (email !== ADMIN_EMAIL.toLowerCase()){
+      toast("Email xato ❌");
+      return;
+    }
+    setSessionOk(true);
+    unlock();
+    renderAll();
+  });
+
+  $("#gateClose").addEventListener("click", ()=>{
+    // yopilsa ham ruxsat bo‘lmasa ishlamaydi
+    if (!isSessionOk()){
+      toast("Email xato ❌");
+      window.location.href = "index.html";
+    }
+  });
+
+  // Logout
+  $("#logoutBtn").addEventListener("click", ()=>{
+    setSessionOk(false);
+    toast("Chiqildi ✅");
+    window.location.href = "index.html";
+  });
+
+  // ===== State =====
+  let state = {
+    products: load(K_PRODUCTS, []),
+    orders: load(K_ORDERS, [])
+  };
+
+  let editingId = null;
+  let uploadedImageDataUrl = null;
+
+  // ===== Image upload (JPG only) =====
+  $("#pImgFile").addEventListener("change", (e)=>{
+    const file = e.target.files?.[0];
+    uploadedImageDataUrl = null;
+
+    const img = $("#pImgPreview");
+    const hint = $("#pImgPreviewHint");
+
+    if (!file){
+      img.style.display = "none";
+      hint.textContent = "JPG tanlasangiz shu yerda ko‘rinadi";
+      return;
+    }
+
+    if (file.type !== "image/jpeg"){
+      toast("Faqat JPG ruxsat ✅");
+      e.target.value = "";
+      img.style.display = "none";
+      hint.textContent = "Faqat JPG yuklang";
+      return;
+    }
+
+    if (file.size > 900 * 1024){
+      toast("Rasm katta. 900KB dan kichikroq JPG tavsiya.");
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      uploadedImageDataUrl = reader.result; // data:image/jpeg;base64,...
+      img.src = uploadedImageDataUrl;
+      img.style.display = "block";
+      hint.textContent = "JPG yuklandi ✅";
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function resetForm(){
+    editingId = null;
+    uploadedImageDataUrl = null;
+
+    $("#modeText").textContent = "Yangi mahsulot";
+    $("#cancelEditBtn").style.display = "none";
+
+    $("#pName").value = "";
+    $("#pPrice").value = "";
+    $("#pImgUrl").value = "";
+    $("#pStock").value = "";
+    $("#pDiscount").value = "0";
+    $("#pDiscountPrice").value = "";
+    $("#pImgFile").value = "";
+
+    const img = $("#pImgPreview");
+    const hint = $("#pImgPreviewHint");
+    img.src = "";
+    img.style.display = "none";
+    hint.textContent = "JPG tanlasangiz shu yerda ko‘rinadi";
+  }
+
+  function validateProduct(){
+    const name = $("#pName").value.trim();
+    const price = Number($("#pPrice").value);
+    const imgUrl = $("#pImgUrl").value.trim();
+    const stock = Number($("#pStock").value);
+
+    const isDisc = $("#pDiscount").value === "1";
+    const discRaw = $("#pDiscountPrice").value.trim();
+    const discPrice = discRaw ? Number(discRaw) : null;
+
+    const finalImg = uploadedImageDataUrl || imgUrl;
+
+    if (!name || !price || price <= 0){
+      toast("Nomi va narx majburiy");
+      return null;
+    }
+    if (!finalImg){
+      toast("Rasm JPG yuklang yoki URL kiriting");
+      return null;
+    }
+
+    return {
+      name,
+      price,
+      image_url: finalImg,
+      stock_qty: isFinite(stock) && stock >= 0 ? stock : 0,
+      is_discount: isDisc,
+      discount_price: (isDisc && discPrice && discPrice > 0) ? discPrice : null
+    };
+  }
+
+  function renderList(){
+    const wrap = $("#list");
+    state.products = load(K_PRODUCTS, []);
+    if (!state.products.length){
+      wrap.innerHTML = `<div class="hint">Mahsulot yo‘q.</div>`;
+      return;
+    }
+
+    wrap.innerHTML = state.products.map(p => `
+      <div class="adminRow">
+        <div class="adminRowLeft">
+          <div class="adminThumb"><img src="${p.image_url}" alt=""></div>
+          <div>
+            <b>${p.name}</b>
+            <div class="muted small">
+              ${fmt(p.price)} ${hasDiscount(p) ? `→ <b>${fmt(p.discount_price)}</b>` : ``}
+              • Ombor: <b>${p.stock_qty ?? 0}</b>
+            </div>
+          </div>
+        </div>
+        <div class="adminRowBtns">
+          <button class="btn" onclick="editProduct('${p.id}')">✏️</button>
+          <button class="btn danger" onclick="deleteProduct('${p.id}')">🗑️</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  window.editProduct = function(id){
+    const p = state.products.find(x => x.id === id);
+    if (!p) return;
+
+    editingId = id;
+    $("#modeText").textContent = "Tahrirlash rejimi ✏️";
+    $("#cancelEditBtn").style.display = "inline-flex";
+
+    $("#pName").value = p.name || "";
+    $("#pPrice").value = p.price || "";
+    $("#pImgUrl").value = (p.image_url || "").startsWith("data:image") ? "" : (p.image_url || "");
+    $("#pStock").value = p.stock_qty ?? 0;
+    $("#pDiscount").value = (p.is_discount && p.discount_price) ? "1" : "0";
+    $("#pDiscountPrice").value = p.discount_price || "";
+
+    // Preview (agar dataURL bo‘lsa)
+    const img = $("#pImgPreview");
+    const hint = $("#pImgPreviewHint");
+    if ((p.image_url || "").startsWith("data:image")){
+      img.src = p.image_url;
+      img.style.display = "block";
+      hint.textContent = "Saqlangan JPG (preview) ✅";
+      uploadedImageDataUrl = p.image_url;
+    } else {
+      img.src = "";
+      img.style.display = "none";
+      hint.textContent = "JPG tanlasangiz shu yerda ko‘rinadi";
+      uploadedImageDataUrl = null;
+    }
+  }
+
+  window.deleteProduct = function(id){
+    if (!confirm("Mahsulot o‘chirilsinmi?")) return;
+    state.products = state.products.filter(p => p.id !== id);
+    save(K_PRODUCTS, state.products);
+    toast("O‘chirildi 🗑️");
+    resetForm();
+    renderList();
+  }
+
+  $("#saveBtn").addEventListener("click", ()=>{
+    const data = validateProduct();
+    if (!data) return;
+
+    state.products = load(K_PRODUCTS, []);
+
+    if (editingId){
+      const p = state.products.find(x => x.id === editingId);
+      if (!p){ resetForm(); return; }
+      Object.assign(p, data);
+      toast("Yangilandi ✅");
+    } else {
+      state.products.unshift({ id: uid(), ...data });
+      toast("Qo‘shildi ✅");
+    }
+
+    save(K_PRODUCTS, state.products);
+    resetForm();
+    renderList();
+  });
+
+  $("#newBtn").addEventListener("click", ()=>{
+    resetForm();
+    toast("Yangi mahsulot ✅");
+  });
+
+  $("#cancelEditBtn").addEventListener("click", resetForm);
+
+  $("#refreshBtn").addEventListener("click", ()=>{
+    state.products = load(K_PRODUCTS, []);
+    renderList();
+    toast("Yangilandi ✅");
+  });
+
+  // ===== Orders =====
+  function statusClass(s){
+    return s === "new" ? "new" :
+           s === "picking" ? "picking" :
+           s === "ready" ? "ready" :
+           "cancelled";
+  }
+  function statusLabel(s){
+    if (s === "new") return "Yangi";
+    if (s === "picking") return "Yig‘ilmoqda";
+    if (s === "ready") return "Tayyor";
+    return "Bekor";
+  }
+
+  function renderOrders(){
+    const wrap = $("#orders");
+    state.orders = load(K_ORDERS, []);
+
+    if (!state.orders.length){
+      wrap.innerHTML = `<div class="hint">Hozircha buyurtma yo‘q.</div>`;
+      return;
+    }
+
+    wrap.innerHTML = state.orders.map(o => {
+      const totalReq  = o.items.reduce((s,i)=>s+i.unit_price*i.qty_requested,0);
+      const totalAppr = o.items.reduce((s,i)=>s+i.unit_price*i.qty_approved,0);
+
+      const itemsHtml = o.items.map((it, idx) => `
+        <li>
+          ${it.name} — <span class="muted">${fmt(it.unit_price)}</span>
+          | so‘ralgan: <b>${it.qty_requested}</b>
+          | tasdiq:
+          <input type="number" min="0" value="${it.qty_approved}" class="mini"
+            onchange="setApproved('${o.id}', ${idx}, this.value)" />
+        </li>
+      `).join("");
+
+      const statusSelect = `
+        <select onchange="setStatus('${o.id}', this.value)" class="miniSel">
+          <option value="new" ${o.status==="new"?"selected":""}>Yangi</option>
+          <option value="picking" ${o.status==="picking"?"selected":""}>Yig‘ilmoqda</option>
+          <option value="ready" ${o.status==="ready"?"selected":""}>Tayyor</option>
+          <option value="cancelled" ${o.status==="cancelled"?"selected":""}>Bekor</option>
+        </select>
+      `;
+
+      return `
+        <div class="order">
+          <div class="orderTop">
+            <div>
+              <b>#${o.id.slice(-6)}</b>
+              <small> • ${new Date(o.created_at).toLocaleString()}</small>
+              <div style="margin-top:6px">
+                <span class="muted">Haridor:</span>
+                <b>${o.customer.firstName} ${o.customer.lastName}</b>
+                <span class="muted"> • Tel:</span> <b>${o.customer.phone}</b>
+              </div>
+              <div style="margin-top:6px">
+                <span class="muted">To‘lov:</span>
+                <b>${o.payment_method === "cash" ? "Naqd" : "Karta"}</b>
+                ${o.card_last4 ? `<span class="muted"> (**** ${o.card_last4})</span>` : ``}
+              </div>
+            </div>
+
+            <div style="text-align:right">
+              ${statusSelect}
+              <div class="muted small" style="margin-top:8px">So‘ralgan: <b>${fmt(totalReq)}</b></div>
+              <div class="muted small" style="margin-top:2px">Tasdiqlangan: <b>${fmt(totalAppr)}</b></div>
+              <div style="margin-top:6px">
+                <span class="status ${statusClass(o.status)}">${statusLabel(o.status)}</span>
+              </div>
+            </div>
+          </div>
+
+          <ul>${itemsHtml}</ul>
+        </div>
+      `;
+    }).join("");
+  }
+
+  window.setApproved = function(orderId, idx, val){
+    const orders = load(K_ORDERS, []);
+    const o = orders.find(x => x.id === orderId);
+    if (!o) return;
+
+    const n = Math.max(0, Math.floor(Number(val || 0)));
+    o.items[idx].qty_approved = n;
+
+    save(K_ORDERS, orders);
+    renderOrders();
+  }
+
+  window.setStatus = function(orderId, val){
+    const orders = load(K_ORDERS, []);
+    const o = orders.find(x => x.id === orderId);
+    if (!o) return;
+
+    o.status = val;
+    save(K_ORDERS, orders);
+    renderOrders();
+  }
+
+  $("#refreshOrdersBtn").addEventListener("click", ()=>{
+    renderOrders();
+    toast("Yangilandi ✅");
+  });
+
+  function renderAll(){
+    renderList();
+    renderOrders();
+  }
+
+  // ===== Init =====
+  if (isSessionOk()){
+    unlock();
+    renderAll();
+  } else {
+    requireGate();
+  }
+</script>
+</body>
+</html>

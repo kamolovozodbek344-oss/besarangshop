@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <title>Haridor — Ozodbek Shop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Haridor Panel</h1>
+        <small class="muted">Buyurtmalarim</small>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="goShop()">🛍 Do‘kon</button>
+      <button class="btn danger" onclick="logout()">Chiqish</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- LOGIN / IDENTIFY -->
+  <section class="card" id="loginCard">
+    <div class="hd">
+      <h2>👤 Haridor ma’lumotlari</h2>
+    </div>
+    <div class="bd">
+      <div class="hint" style="margin-bottom:10px">
+        Buyurtmalarni ko‘rish uchun ism/familiya va telefon kiriting.
+      </div>
+
+      <div class="split">
+        <div>
+          <label class="muted" style="font-size:12px">Ism</label>
+          <input id="firstName" placeholder="Ism">
+        </div>
+        <div>
+          <label class="muted" style="font-size:12px">Familiya</label>
+          <input id="lastName" placeholder="Familiya">
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label class="muted" style="font-size:12px">Telefon</label>
+        <input id="phone" placeholder="+998 90 777 92 65">
+      </div>
+
+      <div class="line"></div>
+
+      <button class="btn primary" style="width:100%" onclick="saveCustomer()">Kirish</button>
+      <div class="hint" style="margin-top:10px">
+        Telefon bo‘yicha buyurtmalar filtrlab ko‘rsatiladi.
+      </div>
+    </div>
+  </section>
+
+  <br>
+
+  <!-- ORDERS -->
+  <section class="card">
+    <div class="hd">
+      <h2>🧾 Buyurtmalarim</h2>
+      <div class="row" style="gap:10px">
+        <button class="btn" onclick="refresh()">🔄 Yangilash</button>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="hint" id="meHint" style="margin-bottom:10px">Avval kirish qiling.</div>
+
+      <div class="card" style="background: rgba(255,255,255,.03); border:1px solid var(--border)">
+        <div class="bd">
+          <div class="split">
+            <div>
+              <label class="muted" style="font-size:12px">Telefon bilan qidirish</label>
+              <input id="searchPhone" placeholder="+998..." oninput="renderOrders()">
+            </div>
+            <div>
+              <label class="muted" style="font-size:12px">Status filter</label>
+              <select id="statusFilter" onchange="renderOrders()">
+                <option value="all">Barchasi</option>
+                <option value="new">Yangi</option>
+                <option value="picking">Yig‘ilmoqda</option>
+                <option value="ready">Tayyor</option>
+                <option value="cancelled">Bekor</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+
+      <div class="orders" id="orders"></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ===== STORAGE KEYS (index.html bilan bir xil bo‘lishi shart) =====
+  const K_USER = "oz_shop_user_v1";
+  const K_ORDERS = "oz_shop_orders_v1";
+
+  const $ = s => document.querySelector(s);
+
+  function normalizePhone(p){
+    return (p || "").replace(/\s+/g, "").trim();
+  }
+
+  function statusLabel(s){
+    if (s === "new") return "Yangi";
+    if (s === "picking") return "Yig‘ilmoqda";
+    if (s === "ready") return "Tayyor";
+    return "Bekor";
+  }
+
+  function fmt(n){
+    const x = Math.round(Number(n || 0));
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " so‘m";
+  }
+
+  function goShop(){ location.href = "index.html"; }
+
+  function logout(){
+    localStorage.removeItem(K_USER);
+    location.reload();
+  }
+
+  function saveCustomer(){
+    const firstName = $("#firstName").value.trim();
+    const lastName = $("#lastName").value.trim();
+    const phone = $("#phone").value.trim();
+
+    if (!firstName || !lastName || !phone){
+      alert("Ism, familiya, telefon majburiy!");
+      return;
+    }
+
+    const user = { role:"customer", firstName, lastName, phone };
+    localStorage.setItem(K_USER, JSON.stringify(user));
+
+    $("#searchPhone").value = normalizePhone(phone);
+    refresh();
+  }
+
+  function getUser(){
+    try { return JSON.parse(localStorage.getItem(K_USER)); } catch { return null; }
+  }
+
+  function getOrders(){
+    try { return JSON.parse(localStorage.getItem(K_ORDERS)) || []; } catch { return []; }
+  }
+
+  function refresh(){
+    const user = getUser();
+    if (!user || user.role !== "customer"){
+      $("#meHint").textContent = "Avval kirish qiling.";
+      $("#orders").innerHTML = `<div class="hint">Buyurtmalarni ko‘rish uchun ma’lumot kiriting.</div>`;
+      return;
+    }
+
+    $("#meHint").innerHTML = `Siz: <b>${user.firstName} ${user.lastName}</b> • Tel: <b>${user.phone}</b>`;
+    $("#searchPhone").value = normalizePhone(user.phone);
+    renderOrders();
+  }
+
+  function renderOrders(){
+    const user = getUser();
+    const wrap = $("#orders");
+    const all = getOrders();
+
+    const searchPhone = normalizePhone($("#searchPhone").value);
+    const statusF = $("#statusFilter").value;
+
+    if (!user || user.role !== "customer"){
+      wrap.innerHTML = `<div class="hint">Avval kirish qiling.</div>`;
+      return;
+    }
+
+    let list = all;
+
+    // Haridor faqat o‘z buyurtmalarini ko‘radi:
+    // Telefon bo‘yicha (eng ishonchli)
+    const myPhone = normalizePhone(user.phone);
+    list = list.filter(o => normalizePhone(o.customer?.phone) === myPhone);
+
+    // Qo‘shimcha qidiruv (agar boshqa raqam kiritilsa ham, faqat o‘z raqamiga moslari qoladi)
+    if (searchPhone){
+      list = list.filter(o => normalizePhone(o.customer?.phone).includes(searchPhone));
+    }
+
+    if (statusF !== "all"){
+      list = list.filter(o => o.status === statusF);
+    }
+
+    if (!list.length){
+      wrap.innerHTML = `<div class="hint">Sizda hozircha buyurtma yo‘q (yoki filtr bo‘yicha topilmadi).</div>`;
+      return;
+    }
+
+    wrap.innerHTML = list.map(o => {
+      const totalApproved = (o.items || []).reduce((s,i)=>s + (i.unit_price||0) * (i.qty_approved||0), 0);
+      const totalRequested = (o.items || []).reduce((s,i)=>s + (i.unit_price||0) * (i.qty_requested||0), 0);
+
+      const pay = o.payment_method === "card" ? "Karta" : "Naqd";
+      const last4 = o.card_last4 ? ` (**** ${o.card_last4})` : "";
+
+      return `
+        <div class="order">
+          <div class="orderTop">
+            <div>
+              <b>#${(o.id||"").slice(-6)}</b>
+              <small> • ${(o.created_at ? new Date(o.created_at).toLocaleString() : "")}</small>
+              <div style="margin-top:6px">
+                <span class="muted">To‘lov:</span> <b>${pay}${last4}</b>
+              </div>
+              <div style="margin-top:6px">
+                <span class="muted">Status:</span>
+                <span class="status ${o.status}">${statusLabel(o.status)}</span>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div class="muted" style="font-size:12px">So‘ralgan</div>
+              <b>${fmt(totalRequested)}</b>
+              <div class="muted" style="font-size:12px; margin-top:6px">Tasdiqlangan</div>
+              <b>${fmt(totalApproved)}</b>
+            </div>
+          </div>
+
+          <ul>
+            ${(o.items||[]).map(i => `
+              <li>
+                ${i.name} —
+                so‘ralgan: <b>${i.qty_requested}</b>,
+                tasdiq: <b>${i.qty_approved}</b>
+                <span class="muted"> • ${fmt(i.unit_price)}</span>
+              </li>
+            `).join("")}
+          </ul>
+
+          ${o.note ? `<div class="hint" style="margin-top:8px"><span class="muted">Izoh:</span> ${o.note}</div>` : ``}
+        </div>
+      `;
+    }).join("");
+  }
+
+  // Prefill login fields if already customer
+  (function init(){
+    const user = getUser();
+    if (user && user.role === "customer"){
+      $("#firstName").value = user.firstName || "";
+      $("#lastName").value = user.lastName || "";
+      $("#phone").value = user.phone || "";
+      $("#searchPhone").value = normalizePhone(user.phone);
+    }
+    refresh();
+  })();
+</script>
+
+</body>
+</html>
